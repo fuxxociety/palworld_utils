@@ -4,7 +4,7 @@ import json
 
 import requests
 
-import config
+from utility.config import *
 from rcon import rcon_command
 from utility.logging_config import setup_logger, log_info, log_error
 
@@ -14,9 +14,8 @@ headers = None
 status = None
 data = None
 text = None
-admin_username = config.ADMIN_USER
-admin_password = config.ADMIN_PASS
-baseurl = f"http://{config.SERVER_IP}:{config.REST_PORT}/v1/api/"
+
+baseurl = f"http://{SERVER_IP}:{REST_PORT}/v1/api/"
 
 # Define valid commands and their descriptions
 valid_commands = {
@@ -46,7 +45,7 @@ def send_get_request(command):
     try:
         headers = {
             'Accept': 'application/json',
-            'Authorization': f'Basic {base64.b64encode(f"{admin_username}:{admin_password}".encode()).decode()}'
+            'Authorization': f'Basic {base64.b64encode(f"{ADMIN_USER}:{ADMIN_PASS}".encode()).decode()}'
         }
         # command "status" doesnt exist, use 'info' to get a valid response
         status_convert = False
@@ -121,7 +120,7 @@ def send_post_request(postcmd):
     try:
         headers = {
             'Content-Type': 'application/json',
-            'Authorization': f'Basic {base64.b64encode(f"{config.ADMIN_USER}:{config.ADMIN_PASS}".encode()).decode()}'
+            'Authorization': f'Basic {base64.b64encode(f"{ADMIN_USER}:{ADMIN_PASS}".encode()).decode()}'
         }
         # Don't set a timeout, the save command will hang until the server finishes.
         response = requests.post(f"{baseurl}{postcmd}", headers=headers, data=payload)
@@ -166,7 +165,7 @@ def run_command(command, *args, timeout=10):
 
     # TODO: If returning a status_code of != 200, log the error and exit
     #  Unless the command is 'info' or 'status'
-    rest_api_port = config.REST_PORT
+    rest_api_port = REST_PORT
     if rest_api_port:
         if command in ["players", "info", "status", "settings", "metrics"]:
             # No arguments are accepted.
@@ -181,7 +180,7 @@ def run_command(command, *args, timeout=10):
                 log_error("This command does not recognize any arguments.")
                 return False
             else:
-                if not config.WRAPPER:
+                if not WRAPPER:
                     # POST: palworld REST API: no json to send, no json response
                     payload = {}
                 else:
