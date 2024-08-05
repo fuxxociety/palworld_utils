@@ -10,9 +10,9 @@ from datetime import datetime, timedelta
 
 import psutil
 
-import config
-import detect_api
-from logging_config import setup_logger, log_error, log_info, os_platform
+from utility.config import *
+from utility.detect_api import run_command
+from utility.logging_config import setup_logger, log_error, log_info, os_platform
 
 game_path = None
 backups_path = None
@@ -27,7 +27,7 @@ def game_local():
         if not os_platform == 'win32':
             ip_result = subprocess.check_output("hostname -I", shell=True).decode().strip()
             local_ip_addresses = ip_result.split()
-            if config.SERVER_IP in local_ip_addresses:
+            if SERVER_IP in local_ip_addresses:
                 is_local = True
             else:
                 is_local = False
@@ -38,7 +38,7 @@ def game_local():
                 if "IPv4 Address" in line:
                     ip_address = line.split(':')[1].strip()
                     local_ip_addresses.append(ip_address)
-            if config.SERVER_IP in local_ip_addresses:
+            if SERVER_IP in local_ip_addresses:
                 is_local = True
             else:
                 is_local = False
@@ -50,7 +50,7 @@ def set_backup_dir():
     global backups_path
     if os_platform != 'win32':
         # set up OS-Specific paths
-        backups_path = config.BACKUPS_PATH
+        backups_path = BACKUPS_PATH
     else:
         backups_path = f"{os.path.join(os.getenv('USERPROFILE'), 'Desktop')}"
     return backups_path
@@ -59,7 +59,7 @@ def set_backup_dir():
 def set_gamesave_dir():
     global game_path
     if os_platform != 'win32':
-        game_path = config.GAMESAVE_PATH
+        game_path = GAMESAVE_PATH
     else:
         game_path = f"{os.path.join(os.getenv('USERPROFILE'), 'Desktop', 'Palworld')}"
     return game_path
@@ -128,7 +128,7 @@ def calculate_average_backup_size(backup_dir):
 # Function to check available disk space
 def check_disk_space():
     if os_platform != 'win32':
-        statvfs = os.statvfs(config.GAMESAVE_PATH)
+        statvfs = os.statvfs(GAMESAVE_PATH)
         free_space = statvfs.f_frsize * statvfs.f_bfree
     else:
         usage = psutil.disk_usage(os.getenv('USERPROFILE'))
@@ -210,7 +210,7 @@ def start_service(timeout=10):
             # Handle other exceptions
             log_error(f"\nAn unexpected error occurred: %s", str(e))
     else:
-        cmd_result = detect_api.run_command("start", timeout=timeout)
+        cmd_result = run_command("start", timeout=timeout)
         if cmd_result:
             if check_if_running(timeout=timeout, expect_running=True):  # True if the server is in expected state
                 return True
@@ -219,7 +219,8 @@ def start_service(timeout=10):
                 log_error(f"\nStart command failed.")
                 return False
         else:
-            log_error(f"\nRemote start command failed: {detect_api.data}")
+            from utility.detect_api import data
+            log_error(f"\nRemote start command failed: {data}")
             return False
     log_info(f"\nPalworld service started successfully.")
 
@@ -238,13 +239,13 @@ def restart_service(timeout):
         if is_local:
             log_info("locally.")
             if check_if_running(expect_running=True):  # True if the server is in expected state
-                result = subprocess.Popen(['sudo', 'systemctl', 'restart', config.SERVICE_NAME],
+                result = subprocess.Popen(['sudo', 'systemctl', 'restart', SERVICE_NAME],
                                           stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 try:
                     stdout, stderr = result.communicate(timeout=timeout)
                     if result.returncode == 0:
                         # Check service status
-                        service_status = subprocess.run(['systemctl', 'is-active', config.SERVICE_NAME],
+                        service_status = subprocess.run(['systemctl', 'is-active', SERVICE_NAME],
                                                         capture_output=True, text=True)
                         if service_status.stdout.strip() == 'active':
                             log_info("Palworld restart is complete.")
@@ -260,7 +261,7 @@ def restart_service(timeout):
                 log_info("Server is not running.")
         else:
             log_info("remotely.")
-            cmd_result = detect_api.run_command("restart", timeout=timeout)
+            cmd_result = run_command("restart", timeout=timeout)
             if cmd_result:
                 if check_if_running(timeout=timeout, expect_running=False):  # True if the server is in expected state
                     log_info("Palworld restart is complete.")
@@ -270,7 +271,8 @@ def restart_service(timeout):
                     log_error(f"Restart command failed.")
                     return False
             else:
-                log_error(f"Remote restart command failed with errors:\n{detect_api.data}")
+                from utility.detect_api import data
+                log_error(f"Remote restart command failed with errors:\n{data}")
                 return False
 
 
@@ -283,7 +285,7 @@ def save_world():
     """
     if check_if_running(expect_running=True, timeout=30):  # False if server is NOT running
         log_info("Saving Palworld world.")
-        if not detect_api.run_command("save") == 200:
+        if not run_command("save") == 200:
             sys.exit("Error sending save command.")
         else:
             log_info("Game was saved.")
@@ -308,9 +310,9 @@ def online_players(max_duration_seconds):
     global num_players
 
     while time.time() < end_time:
-        response = detect_api.run_command("players")
+        response = run_command("players")
         if response:
-            from detect_api import data
+            from utility.detect_api import data
             if response == 200 and data:
                 num_players = len(data.get('players', []))
             else:
@@ -335,13 +337,13 @@ def stop_service(wait_time):
     log_info("Shutting down Palworld server.", end="")
     if check_if_running(expect_running=True, timeout=2):
         if is_local:
-            response = subprocess.Popen(['sudo', 'systemctl', 'shutdown', config.SERVICE_NAME],
+            response = subprocess.Popen(['sudo', 'systemctl', 'shutdown', SERVICE_NAME],
                                         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             try:
                 stdout, stderr = response.communicate()
                 if response.returncode == 0:
                     # Check service status
-                    service_status = subprocess.run(['systemctl', 'is-active', config.SERVICE_NAME],
+                    service_status = subprocess.run(['systemctl', 'is-active', SERVICE_NAME],
                                                     capture_output=True, text=True)
                     if service_status.stdout.strip() == 'active':
                         log_info("Palworld shutdown is complete.")
@@ -360,8 +362,7 @@ def stop_service(wait_time):
         else:
             # Separate the palworld shutdown command wait_time from the script's timeout.
             palworld_wait_time = 1
-            response = detect_api.run_command("shutdown", palworld_wait_time, "shutdown")
-            from detect_api import data
+            response = run_command("shutdown", palworld_wait_time, "shutdown")
             if response == 200:
                 if check_if_running(timeout=wait_time, expect_running=False):  # True if the server is in expected state
                     log_info(f"\nServer shutdown successful.")
@@ -423,7 +424,7 @@ def check_if_running(expect_running, timeout=10):
         else:
             # TODO: If this remote command returns an error, handle gracefully
             #   this code expects any error are squashed
-            status = detect_api.run_command("status", timeout=timeout)
+            status = run_command("status", timeout=timeout)
             # successful 'status' should be "200"
             if (status == 200 and expect_running) or (status != 200 and not expect_running):
                 return True
@@ -490,8 +491,8 @@ def backup_process():
         delete_today = backups_by_day[today_str][:-2]  # Delete the rest for today
         paths_to_delete.extend([file_path for _, file_path in delete_today])
 
-    # Keep the most recent backup for each day within the configured config.DAYS_TO_KEEP
-    for i in range(1, int(config.DAYS_TO_KEEP) + 1):
+    # Keep the most recent backup for each day within the configured DAYS_TO_KEEP
+    for i in range(1, int(DAYS_TO_KEEP) + 1):
         day_str = (current_date - timedelta(days=i)).strftime('%Y-%m-%d')
         if day_str in backups_by_day:
             delete_day = backups_by_day[day_str][:-1]  # Delete the rest for this day
@@ -514,24 +515,24 @@ if __name__ == "__main__":
         backup_process()
         start_service()
     if len(sys.argv) > 1 and sys.argv[1] == "--status":
-        detect_api.run_command("status")
+        run_command("status")
     if len(sys.argv) > 1 and sys.argv[1] == "--info":
-        detect_api.run_command("info")
+        run_command("info")
     if len(sys.argv) > 1 and sys.argv[1] == "--players":
-        detect_api.run_command("players")
+        run_command("players")
     if len(sys.argv) > 1 and sys.argv[1] == "--settings":
-        detect_api.run_command("settings")
+        run_command("settings")
     if len(sys.argv) > 1 and sys.argv[1] == "--metrics":
-        detect_api.run_command("metrics")
+        run_command("metrics")
     if len(sys.argv) > 1 and sys.argv[1] == "--announce":
-        detect_api.run_command("announce", "testing")
+        run_command("announce", "testing")
     if len(sys.argv) > 1 and sys.argv[1] == "--kick":
-        detect_api.run_command("kick", "steam_00000000000000000")
+        run_command("kick", "steam_00000000000000000")
     if len(sys.argv) > 1 and sys.argv[1] == "--ban":
-        detect_api.run_command("ban", "steam_00000000000000000")
+        run_command("ban", "steam_00000000000000000")
     if len(sys.argv) > 1 and sys.argv[1] == "--save":
         log_info("Saving palworld game.")
-        detect_api.run_command("save")
+        run_command("save")
     if len(sys.argv) > 1 and sys.argv[1] == "--start":
         if start_service():
             log_info("Server started successfully.")

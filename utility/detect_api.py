@@ -40,6 +40,8 @@ def send_get_request(command):
     global data
     global text
     global headers
+    response = None
+    status_convert = None
 
     try:
         headers = {
@@ -114,6 +116,7 @@ def send_get_request(command):
 def send_post_request(postcmd):
     global data
     global headers
+    response = None
 
     try:
         headers = {
