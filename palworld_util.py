@@ -1,5 +1,3 @@
-from rcon import rcon_client
-from utility.util import check_for_process, kill_process
 import math
 import os
 import re
@@ -27,7 +25,7 @@ def game_local():
         if not os_platform == 'win32':
             ip_result = subprocess.check_output("hostname -I", shell=True).decode().strip()
             local_ip_addresses = ip_result.split()
-            if SERVER_IP in local_ip_addresses:
+            if SERVER_IP in ['localhost', '127.0.0.1']:
                 is_local = True
             else:
                 is_local = False
@@ -38,7 +36,7 @@ def game_local():
                 if "IPv4 Address" in line:
                     ip_address = line.split(':')[1].strip()
                     local_ip_addresses.append(ip_address)
-            if SERVER_IP in local_ip_addresses:
+            if SERVER_IP in ['localhost', '127.0.0.1']:
                 is_local = True
             else:
                 is_local = False
