@@ -1,0 +1,6 @@
+palworld:
+  address: "10.10.100.15:25575" # host:port, for example 127.0.0.1:16260
+  password: "adminpassword"
+  log: "palworld-rcon.log"
+  type: "rcon" # rcon, telnet, web.
+  timeout: "10s"
