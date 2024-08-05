@@ -159,8 +159,6 @@ def expected_backup_size(backup_dir):
 def compress_backup(input_folder, output_file):
     log_info("Starting Palworld backup.")
     try:
-        # subprocess.run(["tar", "-czf", output_file, "-C", input_folder, "."]
-        #               check = True, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
         subprocess.run(["tar", "-czf", output_file, "-C", input_folder, "."],
                        text=True, check=True, capture_output=True
                        )
@@ -183,19 +181,15 @@ def start_service(timeout=10):
     log_info("Starting Palworld service.", end="")
     if is_local:
         try:
-            result = subprocess.Popen(['sudo', 'systemctl', 'start', 'palworld.service'],
-                                      stdout=subprocess.PIPE,
-                                      stderr=subprocess.PIPE,
-                                      text=True
-                                      )
-            stdout, stderr = result.communicate(timeout=timeout)
+            result = subprocess.run(['sudo', 'systemctl', 'start', SERVICE_NAME],
+                                    text=True, check=True, capture_output=True
+                                    )
             if result.returncode == 0:
-                if check_if_running(timeout=timeout, expect_running=True):  # True if the server is in expected state
-                    return True
+                service_status = subprocess.run(['systemctl', 'is-active', '--quiet', 'palworld.service'])
+                if service_status.returncode == 0:
+                    log_info("Palworld service is active.")
                 else:
-                    # server did not start
-                    log_error(f"\nStart command failed.")
-                    return False
+                    log_error("Palworld service failed to start (status check).")
             else:
                 log_error(f"\nPalworld service failed to start.")
         except subprocess.TimeoutExpired:
@@ -335,27 +329,25 @@ def stop_service(wait_time):
     log_info("Shutting down Palworld server.", end="")
     if check_if_running(expect_running=True, timeout=2):
         if is_local:
-            response = subprocess.Popen(['sudo', 'systemctl', 'shutdown', SERVICE_NAME],
-                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            response = subprocess.run(['sudo', 'systemctl', 'stop', SERVICE_NAME],
+                                      capture_output=True, text=True)
             try:
-                stdout, stderr = response.communicate()
                 if response.returncode == 0:
                     # Check service status
                     service_status = subprocess.run(['systemctl', 'is-active', SERVICE_NAME],
                                                     capture_output=True, text=True)
-                    if service_status.stdout.strip() == 'active':
+                    if service_status.returncode != 0:
                         log_info("Palworld shutdown is complete.")
                         return True
                     else:
-                        log_error("Failed to verify Palworld server is stopped.")
+                        log_error(f"Failed to verify Palworld server is stopped: {service_status.stderr.decode()}")
                         return False
                 else:
-                    log_error(f"Error shutting down Palworld service: {stderr.decode()}")
+                    log_error(f"Error shutting down Palworld service: {response.stderr.decode()}")
                     return False
             except subprocess.TimeoutExpired:
                 response.kill()
-                stdout, stderr = response.communicate()
-                sys.exit(f"Palworld service shutdown timed out: {stderr.decode()}")
+                sys.exit(f"Palworld service shutdown timed out: {response.stderr.decode()}")
 
         else:
             # Separate the palworld shutdown command wait_time from the script's timeout.
