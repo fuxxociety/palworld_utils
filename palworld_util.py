@@ -230,7 +230,7 @@ def restart_service(timeout):
         log_info("Restarting Palworld server ", end="")
         if is_local:
             log_info("locally.")
-            if check_if_running(expect_running=True):  # True if the server is in expected state
+            if check_if_running(expect_running=True):  # True if the server running
                 result = subprocess.Popen(['sudo', 'systemctl', 'restart', SERVICE_NAME],
                                           stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 try:
@@ -334,13 +334,12 @@ def stop_service(wait_time):
             try:
                 if response.returncode == 0:
                     # Check service status
-                    service_status = subprocess.run(['systemctl', 'is-active', SERVICE_NAME],
-                                                    capture_output=True, text=True)
-                    if service_status.returncode != 0:
-                        log_info("Palworld shutdown is complete.")
+                    if check_if_running(timeout=10, expect_running=False):  # True if the server is not running.
+                        log_info("Palworld stopped successfully.")
                         return True
                     else:
-                        log_error(f"Failed to verify Palworld server is stopped: {service_status.stderr.decode()}")
+                        # server did not start
+                        log_error(f"Palworld failed to stop in time.")
                         return False
                 else:
                     log_error(f"Error shutting down Palworld service: {response.stderr.decode()}")
@@ -389,38 +388,15 @@ def check_if_running(expect_running, timeout=10):
     #   true/false/fail for current status
     end_time = time.time() + timeout
     while time.time() < end_time:
-        if is_local:
-            # game running on localhost
-            try:
-                result = subprocess.run(
-                    ['systemctl', 'is-active', 'palworld.service'],
-                    capture_output=True, text=True, check=True
-                )
-                status = result.stdout.strip()
-                if status == 'inactive':
-                    # Service is inactive
-                    return False
-                elif status == 'active':
-                    # Service is still running
-                    pass
-                else:
-                    # Unexpected output
-                    log_info("check_if_running: Unexpected output")
-                    return "Fail"
-            except subprocess.CalledProcessError:
-                # Handle the case where 'systemctl' fails (e.g., service does not exist)
-                log_error("Service unit palworld.service does not exist.")
-                return "Fail"
-        else:
-            # TODO: If this remote command returns an error, handle gracefully
-            #   this code expects any error are squashed
-            status = run_command("status", timeout=timeout)
-            # successful 'status' should be "200"
-            if (status == 200 and expect_running) or (status != 200 and not expect_running):
-                return True
+        # TODO: If this remote command returns an error, handle gracefully
+        #   this code expects any error are squashed
+        status = run_command("status", timeout=timeout)
+        # successful 'status' should be "200"
+        if (status == 200 and expect_running) or (status != 200 and not expect_running):
+            return True
 
-            log_error(".", end="")
-            # loop should continue for next interval
+        log_info(".", end="")
+        # loop should continue for next interval
         time.sleep(1)  # Poll every half-second
     log_error(f"Timed out waiting for palworld.service to stop.")
     return False
