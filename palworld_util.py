@@ -390,15 +390,15 @@ def check_if_running(expect_running, timeout=10):
     while time.time() < end_time:
         # TODO: If this remote command returns an error, handle gracefully
         #   this code expects any error are squashed
-        status = run_command("status", timeout=timeout)
+        status = run_command("status")
         # successful 'status' should be "200"
         if (status == 200 and expect_running) or (status != 200 and not expect_running):
             return True
-
-        log_info(".", end="")
+        else:
+            time.sleep(1)
+            continue
+        #log_info(".", end="")
         # loop should continue for next interval
-        time.sleep(1)  # Poll every half-second
-    log_error(f"Timed out waiting for palworld.service to stop.")
     return False
 
 
